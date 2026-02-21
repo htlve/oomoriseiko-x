@@ -1,16 +1,50 @@
 const timeline = document.getElementById('timeline');
 const tweetInput = document.getElementById('tweet-input');
 const tweetBtn = document.getElementById('tweet-btn');
-const charCount = document.getElementById('char-count');
 
 let myTweets = JSON.parse(localStorage.getItem('tw_2015_data')) || [];
 
-// 1. 自分の投稿を表示する関数
-function renderMyTweets() {
-    const myTweetsHtml = myTweets.slice().reverse().map((t) => `
-        <div class="tweet">
+// 大森靖子さんの最新ツイートを取得する関数
+async function fetchSeiko() {
+    // 複数の変換プロキシを試すことで、"絶対に"に近い確率で取得します
+    const urls = [
+        `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nitter.net/oomoriseiko/rss')}`,
+        `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nitter.privacydev.net/oomoriseiko/rss')}`,
+        `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nitter.it/oomoriseiko/rss')}`
+    ];
+
+    let fetchedData = [];
+
+    for (let url of urls) {
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.items && data.items.length > 0) {
+                fetchedData = data.items.map(item => ({
+                    text: item.description.replace(/<[^>]*>/g, ''), // HTMLタグを消す
+                    user: "大森靖子⌨️",
+                    id: "@oomoriseiko",
+                    date: new Date(item.pubDate).toLocaleString('ja-JP', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}),
+                    timestamp: new Date(item.pubDate).getTime(),
+                    isOfficial: true
+                }));
+                break; // 取得できたらループを抜ける
+            }
+        } catch (e) {
+            console.log("接続先を切り替えます...");
+        }
+    }
+    render(fetchedData);
+}
+
+function render(seikoData) {
+    // 自分の投稿と大森さんの投稿を混ぜて、新しい順に並べる
+    const all = [...myTweets, ...seikoData].sort((a, b) => b.timestamp - a.timestamp);
+    
+    timeline.innerHTML = all.map(t => `
+        <div class="tweet" style="${t.isOfficial ? 'background:#fff;' : 'background:#f9f9f9;'}">
             <div class="user-info">
-                <span class="display-name">${t.user}</span>
+                <span class="display-name" style="${t.isOfficial ? 'color:#55acee;' : ''}">${t.user}</span>
                 <span class="user-id">${t.id}</span>
                 <span class="date">・ ${t.date}</span>
             </div>
@@ -18,68 +52,25 @@ function renderMyTweets() {
             <div class="actions">
                 <span>🔄 リツイート</span>
                 <span>★ お気に入り</span>
-                <span onclick="deleteTweet(${t.timestamp})" style="color:#e0245e">🗑 削除</span>
             </div>
         </div>
     `).join('');
-    
-    // 自分のツイートエリアを更新
-    document.getElementById('my-tweets-container').innerHTML = myTweetsHtml;
 }
 
-// 2. 大森靖子さんの公式タイムラインを読み込む（2015年風に調整）
-function loadSeikoTimeline() {
-    const container = document.getElementById('seiko-timeline-container');
-    container.innerHTML = `
-        <a class="twitter-timeline" 
-           data-lang="ja" 
-           data-height="1000" 
-           data-chrome="noheader nofooter noborders transparent" 
-           href="https://twitter.com/oomoriseiko?ref_src=twsrc%5Etfw">
-           大森靖子のツイートを読み込み中...
-        </a>
-    `;
-    // Twitterのスクリプトを動的に読み込み
-    const script = document.createElement('script');
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.charset = "utf-8";
-    document.body.appendChild(script);
-}
-
-// 投稿ボタンの処理
+// 自分の投稿
 tweetBtn.onclick = () => {
-    const text = tweetInput.value.trim();
-    if (!text) return;
-    const newTweet = {
-        text: text, user: "自分", id: "@me",
+    const val = tweetInput.value.trim();
+    if(!val) return;
+    myTweets.push({
+        text: val, user: "自分", id: "@me",
         date: new Date().toLocaleString('ja-JP', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}),
-        timestamp: Date.now()
-    };
-    myTweets.push(newTweet);
+        timestamp: Date.now(), isOfficial: false
+    });
     localStorage.setItem('tw_2015_data', JSON.stringify(myTweets));
     tweetInput.value = '';
-    charCount.innerText = "140";
-    renderMyTweets();
+    fetchSeiko();
 };
 
-window.deleteTweet = (ts) => {
-    if(confirm('削除しますか？')) {
-        myTweets = myTweets.filter(t => t.timestamp !== ts);
-        localStorage.setItem('tw_2015_data', JSON.stringify(myTweets));
-        renderMyTweets();
-    }
-};
-
-tweetInput.oninput = () => {
-    const len = tweetInput.value.length;
-    charCount.innerText = 140 - len;
-    tweetBtn.disabled = (len === 0 || len > 140);
-};
-
-// 初期表示
-document.getElementById('timeline').innerHTML = `
-    <div id="my-tweets-container"></div>
-    <div id="seiko-timeline-container"></div>
-`;
-renderMyTweets();
-loadSeikoTimeline();
+fetchSeiko();
+// 1分ごとに自動更新
+setInterval(fetchSeiko, 60000);
