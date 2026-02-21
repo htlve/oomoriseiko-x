@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Twitter 2015</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+</head>
+<body>
+    <header>
+        <div class="nav">
+            <span class="home-icon">🏠 ホーム</span>
+            <span class="logo">🐦</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tweet-box">
+            <textarea id="tweet-input" placeholder="いまどうしてる？" maxlength="140"></textarea>
+            <div class="tweet-box-footer">
+                <span id="char-count">140</span>
+                <button id="tweet-btn" disabled>ツイート</button>
+            </div>
+        </div>
+        <div id="timeline">
+            <div class="loading">読み込み中...</div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
